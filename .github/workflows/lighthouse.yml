@@ -1,0 +1,64 @@
+name: Weekly Lighthouse check
+
+on:
+    schedule:
+        - cron: "30 7 * * 1" # Mondays, 7:30am UTC
+    workflow_dispatch: # lets you run it manually from the Actions tab
+
+permissions:
+    contents: write # needed to commit the score log
+
+jobs:
+    lighthouse:
+        runs-on: ubuntu-24.04
+        steps:
+            - name: Check out repo
+              uses: actions/checkout@v4
+
+            - name: Run Lighthouse
+              id: lh
+              uses: treosh/lighthouse-ci-action@v12
+              with:
+                  # Add one URL per line
+                  urls: |
+                      https://kerryclements.com
+                      https://jewishjourney.kerryclements.com
+                      https://periodictable.kerryclements.com
+                      https://jobsdone.kerryclements.com
+                      https://cryptotracker.kerryclements.com
+                      https://measureformeasure.kerryclements.com
+                  runs: 3 # runs each site 3 times and uses the middle result
+                  uploadArtifacts: true # full reports downloadable from the run page
+                  temporaryPublicStorage: true # shareable report links (kept for about a week)
+
+            - name: Write summary and log scores
+              env:
+                  MANIFEST: ${{ steps.lh.outputs.manifest }}
+                  LINKS: ${{ steps.lh.outputs.links }}
+              run: |
+                  today=$(date -u +"%Y-%m-%d")
+                  [ -f lighthouse.csv ] || echo "date,site,performance,accessibility,best_practices,seo" > lighthouse.csv
+
+                  echo "| Site | Performance | Accessibility | Best practices | SEO | Report |" >> "$GITHUB_STEP_SUMMARY"
+                  echo "|---|---|---|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
+
+                  echo "$MANIFEST" | jq -c '.[] | select(.isRepresentativeRun)' | while read -r run; do
+                    url=$(echo "$run" | jq -r '.url')
+                    perf=$(echo "$run" | jq -r '(.summary.performance * 100 | round)')
+                    a11y=$(echo "$run" | jq -r '(.summary.accessibility * 100 | round)')
+                    bp=$(echo "$run" | jq -r '(.summary["best-practices"] * 100 | round)')
+                    seo=$(echo "$run" | jq -r '(.summary.seo * 100 | round)')
+                    link=$(echo "$LINKS" | jq -r --arg u "$url" '.[$u] // empty')
+
+                    echo "| $url | $perf | $a11y | $bp | $seo | ${link:+[View]($link)} |" >> "$GITHUB_STEP_SUMMARY"
+                    echo "$today,$url,$perf,$a11y,$bp,$seo" >> lighthouse.csv
+                  done
+
+            - name: Commit score log
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                  git add lighthouse.csv
+                  git commit -m "Log Lighthouse scores $(date -u +%Y-%m-%d)"
+                  git pull --rebase
+                  git push
