@@ -1,0 +1,39 @@
+name: Daily site check
+
+on:
+    schedule:
+        - cron: "0 7 * * *" # 7am UTC (8am UK in summer, 7am in winter)
+    workflow_dispatch: # lets you run it manually from the Actions tab
+
+jobs:
+    check:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check sites are up
+              env:
+                  # Add one URL per line
+                  SITES: |
+                      https://kerryclements.com
+                      https://jewishjourney.kerryclements.com
+              run: |
+                  fail=0
+                  echo "| Site | Status | Result |" >> "$GITHUB_STEP_SUMMARY"
+                  echo "|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
+
+                  for url in $SITES; do
+                    # Retry up to 3 times so a brief blip doesn't cause a false alarm
+                    code=$(curl -s -o /dev/null -w "%{http_code}" -L \
+                      --max-time 20 --retry 3 --retry-delay 10 --retry-all-errors "$url")
+
+                    if [ "$code" = "200" ]; then
+                      result="✅ Up"
+                    else
+                      result="❌ Down"
+                      fail=1
+                    fi
+
+                    echo "$url -> $code ($result)"
+                    echo "| $url | $code | $result |" >> "$GITHUB_STEP_SUMMARY"
+                  done
+
+                  exit $fail
