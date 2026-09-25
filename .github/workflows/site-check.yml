@@ -60,6 +60,8 @@ jobs:
               run: |
                   today=$(date -u +"%Y-%m-%d %H:%M")
 
+                  echo "| Redirect | Status | Result |" >> "$GITHUB_STEP_SUMMARY"
+                  echo "|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
                   echo "$REDIRECTS" | while read -r url expected; do
                     [ -z "$url" ] && continue
                     # Don't follow the redirect, just see where it points
