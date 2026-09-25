@@ -21,6 +21,12 @@ jobs:
                   SITES: |
                       https://kerryclements.com
                       https://jewishjourney.kerryclements.com
+                      https://jj.kerryclements.com
+                      https://periodictable.kerryclements.com
+                      https://jobsdone.kerryclements.com
+                      https://store.kerryclements.com
+                      https://cryptotracker.kerryclements.com
+                      https://measureformeasure.kerryclements.com
               run: |
                   fail=0
                   today=$(date -u +"%Y-%m-%d %H:%M")
