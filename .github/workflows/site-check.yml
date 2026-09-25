@@ -24,7 +24,6 @@ jobs:
                       https://jj.kerryclements.com
                       https://periodictable.kerryclements.com
                       https://jobsdone.kerryclements.com
-                      https://store.kerryclements.com
                       https://cryptotracker.kerryclements.com
                       https://measureformeasure.kerryclements.com
               run: |
@@ -64,7 +63,7 @@ jobs:
                   echo "$REDIRECTS" | while read -r url expected; do
                     [ -z "$url" ] && continue
                     # Don't follow the redirect, just see where it points
-                  read -r code target < <(curl -s -o /dev/null -w "%{http_code} %{redirect_url}" \
+                  read -r code target < <(curl -s -o /dev/null -w "%{http_code} %{redirect_url}\n" \
                   --max-time 20 --retry 3 --retry-delay 10 "$url")
 
                   if [[ "$code" =~ ^30[1278]$ && "$target" == *"$expected"* ]]; then
