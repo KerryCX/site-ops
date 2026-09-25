@@ -53,7 +53,31 @@ jobs:
                   done
 
                   echo "SITE_DOWN=$fail" >> "$GITHUB_ENV"
+            - name: Check redirects point to the right place
+              env:
+                  # Format: URL, then a space, then text the redirect target should contain
+                  REDIRECTS: |
+                      https://store.kerryclements.com etsy.com
+              run: |
+                  today=$(date -u +"%Y-%m-%d %H:%M")
 
+                  echo "$REDIRECTS" | while read -r url expected; do
+                    [ -z "$url" ] && continue
+                    # Don't follow the redirect, just see where it points
+                  read -r code target < <(curl -s -o /dev/null -w "%{http_code} %{redirect_url}" \
+                  --max-time 20 --retry 3 --retry-delay 10 "$url")
+
+                  if [[ "$code" =~ ^30[1278]$ && "$target" == *"$expected"* ]]; then
+                    result="✅ Redirects OK"
+                  else
+                    result="❌ Redirect broken"
+                  echo "SITE_DOWN=1" >> "$GITHUB_ENV"
+                  fi
+
+                  echo "$url -> $code $target ($result)"
+                  echo "| $url | $code | $result |" >> "$GITHUB_STEP_SUMMARY"
+                  echo "$today,$url,$code" >> history.csv
+                  done
             - name: Commit daily log (keeps the schedule active)
               run: |
                   git config user.name "github-actions[bot]"
