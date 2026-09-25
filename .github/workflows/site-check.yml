@@ -5,10 +5,16 @@ on:
         - cron: "0 7 * * *" # 7am UTC (8am UK in summer, 7am in winter)
     workflow_dispatch: # lets you run it manually from the Actions tab
 
+permissions:
+    contents: write # needed to commit the daily log
+
 jobs:
     check:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
+            - name: Check out repo
+              uses: actions/checkout@v4
+
             - name: Check sites are up
               env:
                   # Add one URL per line
@@ -17,6 +23,9 @@ jobs:
                       https://jewishjourney.kerryclements.com
               run: |
                   fail=0
+                  today=$(date -u +"%Y-%m-%d %H:%M")
+                  [ -f history.csv ] || echo "date,site,status" > history.csv
+
                   echo "| Site | Status | Result |" >> "$GITHUB_STEP_SUMMARY"
                   echo "|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
 
@@ -34,6 +43,21 @@ jobs:
 
                     echo "$url -> $code ($result)"
                     echo "| $url | $code | $result |" >> "$GITHUB_STEP_SUMMARY"
+                    echo "$today,$url,$code" >> history.csv
                   done
 
-                  exit $fail
+                  echo "SITE_DOWN=$fail" >> "$GITHUB_ENV"
+
+            - name: Commit daily log (keeps the schedule active)
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                  git add history.csv
+                  git commit -m "Log site check $(date -u +%Y-%m-%d)"
+                  git push
+
+            - name: Fail if any site is down
+              if: env.SITE_DOWN == '1'
+              run: |
+                  echo "One or more sites are down. See the summary above."
+                  exit 1
